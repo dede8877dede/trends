@@ -1,0 +1,59 @@
+name: Viral Dance Check
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour
+  workflow_dispatch:        # manual trigger from GitHub UI
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # Download state files from previous run (seen_videos + video_stats)
+      - name: Restore state
+        uses: actions/download-artifact@v4
+        with:
+          name: bot-state
+          path: viral_bot/
+        continue-on-error: true   # first run has no artifact — that's OK
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            python-telegram-bot==21.11.1 \
+            playwright==1.51.0 \
+            playwright-stealth==2.0.2
+          playwright install chromium --with-deps
+
+      - name: Run viral check
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: "8151600713"
+          VIRAL_MIN_VIEWS: "1000000"
+          VIRAL_MIN_LIKES_RATIO: "0.03"
+          MAX_AGE_HOURS: "168"
+          MIN_GROWTH_VPH: "50000"
+        run: python viral_bot/check.py
+
+      # Save state for next run (persisted 90 days)
+      - name: Save state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-state
+          path: |
+            viral_bot/seen_videos.json
+            viral_bot/video_stats.json
+          retention-days: 90
+          overwrite: true
