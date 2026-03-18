@@ -16,10 +16,10 @@ from telegram.error import TelegramError
 
 TELEGRAM_TOKEN        = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID      = os.environ.get("TELEGRAM_CHAT_ID", "8151600713")
-VIRAL_MIN_VIEWS       = int(os.environ.get("VIRAL_MIN_VIEWS",     "1000000"))
-VIRAL_MIN_LIKES_RATIO = float(os.environ.get("VIRAL_MIN_LIKES_RATIO", "0.03"))
+VIRAL_MIN_VIEWS       = int(os.environ.get("VIRAL_MIN_VIEWS",     "500000"))
+VIRAL_MIN_LIKES_RATIO = float(os.environ.get("VIRAL_MIN_LIKES_RATIO", "0.02"))
 MAX_AGE_HOURS         = int(os.environ.get("MAX_AGE_HOURS",       "168"))
-MIN_GROWTH_VPH        = int(os.environ.get("MIN_GROWTH_VPH",      "50000"))
+MIN_GROWTH_VPH        = int(os.environ.get("MIN_GROWTH_VPH",      "30000"))
 
 BASE_DIR   = Path(__file__).parent
 SEEN_FILE  = BASE_DIR / "seen_videos.json"
@@ -35,8 +35,8 @@ DANCE_KEYWORDS = {
     "dance", "dancing", "dancer", "dancechallenge", "dancetrend",
     "choreography", "choreo", "lipsync", "lip sync", "lipsyncing",
     "shuffle", "twerk", "breakdance", "duet",
-    "танец", "танцы", "танцует", "хореография", "дуэт", "липсинк", "флешмоб",
-    "#dance", "#lipsync", "#choreo", "#dancechallenge", "#танец",
+    "\u0442\u0430\u043d\u0435\u0446", "\u0442\u0430\u043d\u0446\u044b", "\u0442\u0430\u043d\u0446\u0443\u0435\u0442", "\u0445\u043e\u0440\u0435\u043e\u0433\u0440\u0430\u0444\u0438\u044f", "\u0434\u0443\u044d\u0442", "\u043b\u0438\u043f\u0441\u0438\u043d\u043a", "\u0444\u043b\u0435\u0448\u043c\u043e\u0431",
+    "#dance", "#lipsync", "#choreo", "#dancechallenge", "#\u0442\u0430\u043d\u0435\u0446",
 }
 
 logging.basicConfig(
@@ -101,7 +101,7 @@ def evaluate_video(video: dict, stats: dict):
             growth = (views - prev["views"]) / dt_h
             stats[vid_id] = {"views": views, "likes": likes, "ts": now}
             if growth >= MIN_GROWTH_VPH and likes_ok:
-                return True, f"📈 +{growth / 1000:.0f}K views/h"
+                return True, f"\U0001f4c8 +{growth / 1000:.0f}K views/h"
         stats[vid_id]["views"] = views
         stats[vid_id]["likes"] = likes
         return False, None
@@ -111,7 +111,7 @@ def evaluate_video(video: dict, stats: dict):
     if ct:
         age_h = (now - ct) / 3600
         if age_h <= MAX_AGE_HOURS and views >= VIRAL_MIN_VIEWS and likes_ok:
-            return True, f"🆕 {age_h:.0f}h ago · {views / 1_000_000:.1f}M views"
+            return True, f"\U0001f195 {age_h:.0f}h ago \u00b7 {views / 1_000_000:.1f}M views"
     return False, None
 
 
@@ -298,7 +298,7 @@ async def fetch_instagram() -> list[dict]:
 # ── Notify ─────────────────────────────────────────────────────────────────────
 
 async def notify(bot: Bot, video: dict, reason: str):
-    emoji     = "🎵" if video["platform"] == "TikTok" else "📸"
+    emoji     = "\U0001f3b5" if video["platform"] == "TikTok" else "\U0001f4f8"
     views     = video["views"]
     likes     = video["likes"]
     views_str = f"{views / 1_000_000:.1f}M" if views >= 1_000_000 else f"{views / 1_000:.0f}K"
@@ -306,18 +306,18 @@ async def notify(bot: Bot, video: dict, reason: str):
 
     lines = [
         f"{emoji} <b>Viral {video['platform']}!</b>  {reason}",
-        f"👤 @{video['author']}",
+        f"\U0001f464 @{video['author']}",
     ]
     if video["description"]:
-        lines.append(f"📝 {video['description']}")
+        lines.append(f"\U0001f4dd {video['description']}")
     if video["music"]:
-        lines.append(f"🎶 {video['music']}")
+        lines.append(f"\U0001f3b6 {video['music']}")
     lines += ["",
-              f"👁 {views_str} просмотров",
-              f"❤️ {likes_str} лайков",
-              f"💬 {video['comments']:,} комментариев",
+              f"\U0001f441 {views_str} \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u0432",
+              f"\u2764\ufe0f {likes_str} \u043b\u0430\u0439\u043a\u043e\u0432",
+              f"\U0001f4ac {video['comments']:,} \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0435\u0432",
               "",
-              f"🔗 {video['url']}"]
+              f"\U0001f517 {video['url']}"]
     await bot.send_message(
         chat_id=TELEGRAM_CHAT_ID,
         text="\n".join(lines),
@@ -342,11 +342,11 @@ async def main():
     instagram = await fetch_instagram()
     all_vids  = tiktok + instagram
     log.info(f"Total: {len(all_vids)} | Dance matches: {sum(1 for v in all_vids if is_dance_or_lipsync(v))}")
+    for v in all_vids[:3]:
+        log.info(f"Sample desc: {repr(v['description'])} | music: {repr(v['music'])} | challenges: {v['challenges']}")
 
     for video in all_vids:
         if video["id"] in seen:
-            continue
-        if not is_dance_or_lipsync(video):
             continue
         should_notify, reason = evaluate_video(video, stats)
         if should_notify:
@@ -360,7 +360,7 @@ async def main():
 
     save_seen(seen)
     save_stats(stats)
-    log.info(f"Done. Viral dance videos found: {found}")
+    log.info(f"Done. Viral videos found: {found}")
 
 
 if __name__ == "__main__":
