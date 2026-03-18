@@ -14,13 +14,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # Download state files from previous run (seen_videos + video_stats)
       - name: Restore state
-        uses: actions/download-artifact@v4
+        uses: actions/cache/restore@v4
         with:
-          name: bot-state
-          path: viral_bot/
-        continue-on-error: true   # first run has no artifact — that's OK
+          path: |
+            viral_bot/seen_videos.json
+            viral_bot/video_stats.json
+          key: bot-state-${{ github.run_number }}
+          restore-keys: bot-state-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,20 +40,17 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: "8151600713"
-          VIRAL_MIN_VIEWS: "1000000"
-          VIRAL_MIN_LIKES_RATIO: "0.03"
+          VIRAL_MIN_VIEWS: "500000"
+          VIRAL_MIN_LIKES_RATIO: "0.02"
           MAX_AGE_HOURS: "168"
-          MIN_GROWTH_VPH: "50000"
+          MIN_GROWTH_VPH: "30000"
         run: python viral_bot/check.py
 
-      # Save state for next run (persisted 90 days)
       - name: Save state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: bot-state
           path: |
             viral_bot/seen_videos.json
             viral_bot/video_stats.json
-          retention-days: 90
-          overwrite: true
+          key: bot-state-${{ github.run_number }}
